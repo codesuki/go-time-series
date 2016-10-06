@@ -9,6 +9,43 @@ import (
 
 // TODO: do table based testing
 
+func TestNewTimeseries(t *testing.T) {
+	ts, err := NewTimeseries()
+	if ts == nil {
+		t.Errorf("constructor returned nil")
+	}
+	if err != nil {
+		t.Errorf("should not return error")
+	}
+}
+
+func TestNewTimeseriesWithGranularities(t *testing.T) {
+	granularities := []time.Duration{
+		time.Second,
+		time.Minute,
+		time.Hour,
+	}
+	ts, err := NewTimeseriesWithGranularities(granularities)
+	if ts == nil || err != nil {
+		t.Error("could not create time series")
+	}
+
+	badGranularities := []time.Duration{
+		time.Minute,
+		time.Second,
+		time.Hour,
+	}
+	_, err = NewTimeseriesWithGranularities(badGranularities)
+	if err != ErrBadGranularities {
+		t.Error("should not accept decreasing granularities")
+	}
+
+	_, err = NewTimeseriesWithGranularities([]time.Duration{})
+	if err != ErrBadGranularities {
+		t.Error("should not accept empty granularities")
+	}
+}
+
 func TestRecent(t *testing.T) {
 	clock := clock.NewMock()
 	ts := &timeseries{clock: clock, levels: createLevels(clock, []time.Duration{time.Second, time.Minute})}

@@ -99,19 +99,19 @@ type timeseries struct {
 }
 
 // NewTimeseries creates a new TimeSeries with default granularities
-func NewTimeseries() TimeSeries {
+func NewTimeseries() (TimeSeries, error) {
 	return NewTimeseriesWithGranularities(defaultGranularities)
 }
 
 // NewTimeseriesWithGranularities creates a new TimeSeries with provided granularities
 // ErrBadGranularities is returned if granularities are not in increasing order.
-func NewTimeseriesWithGranularities(granularities []time.Duration) TimeSeries {
+func NewTimeseriesWithGranularities(granularities []time.Duration) (TimeSeries, error) {
 	err := checkGranularities(granularities)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	clock := &defaultClock{}
-	return &timeseries{clock: clock, levels: createLevels(clock, granularities)}
+	return &timeseries{clock: clock, levels: createLevels(clock, granularities)}, nil
 }
 
 func checkGranularities(granularities []time.Duration) error {
