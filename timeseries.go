@@ -3,8 +3,6 @@ package timeseries
 import (
 	"errors"
 	"time"
-
-	"github.com/benbjohnson/clock"
 )
 
 // Explanation
@@ -76,6 +74,16 @@ var defaultGranularities = []time.Duration{
 	time.Hour,
 }
 
+type Clock interface {
+	Now() time.Time
+}
+
+type defaultClock struct{}
+
+func (c *defaultClock) Now() time.Time {
+	return time.Now()
+}
+
 type TimeSeries interface {
 	Increase(amount int)
 	IncreaseAtTime(amount int, insertTime time.Time)
@@ -84,7 +92,7 @@ type TimeSeries interface {
 }
 
 type timeseries struct {
-	clock       clock.Clock
+	clock       Clock
 	levels      []level
 	pending     int
 	pendingTime time.Time
@@ -102,7 +110,7 @@ func NewTimeseriesWithGranularities(granularities []time.Duration) TimeSeries {
 	if err != nil {
 		panic(err)
 	}
-	clock := clock.New()
+	clock := &defaultClock{}
 	return &timeseries{clock: clock, levels: createLevels(clock, granularities)}
 }
 
@@ -120,7 +128,7 @@ func checkGranularities(granularities []time.Duration) error {
 	return nil
 }
 
-func createLevels(clock clock.Clock, granularities []time.Duration) []level {
+func createLevels(clock Clock, granularities []time.Duration) []level {
 	levels := make([]level, len(granularities))
 	for i := range granularities {
 		levels[i] = newLevel(clock, granularities[i], 60)
