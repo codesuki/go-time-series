@@ -209,13 +209,3 @@ func (t *timeseries) intersects(start, end time.Time) (bool, error) {
 	}
 	return true, nil
 }
-
-func (t *timeseries) clamp(start, end time.Time) (time.Time, time.Time) {
-	if end.After(t.levels[0].latest()) {
-		end = t.levels[0].latest()
-	}
-	if start.Before(t.levels[len(t.levels)-1].earliest()) {
-		start = end.Add(-t.levels[len(t.levels)-1].duration())
-	}
-	return start, end
-}
