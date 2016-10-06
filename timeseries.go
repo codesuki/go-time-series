@@ -196,7 +196,6 @@ func (t *timeseries) Range(start, end time.Time) (float64, error) {
 	if ok, err := t.intersects(start, end); !ok {
 		return 0, err
 	}
-	//start, end = t.clamp(start, end)
 	for i := range t.levels {
 		// use !start.Before so earliest() is included
 		// if we use earliest().Before() we won't get start
