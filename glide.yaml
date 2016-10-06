@@ -1,3 +1,6 @@
 package: github.com/codesuki/go-time-series
-import:
-- package: github.com/benbjohnson/clock
+homepage: https://github.com/codesuki/go-time-series
+license: MIT
+import: []
+testImport:
+  - package: github.com/benbjohnson/clock
