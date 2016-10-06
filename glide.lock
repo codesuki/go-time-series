@@ -1,0 +1,6 @@
+hash: 07a0865e6834f0cc9c9cd0b5e9df412647d9925173d338de4048f23c665cba0d
+updated: 2016-10-06T11:43:55.619908174+09:00
+imports:
+- name: github.com/benbjohnson/clock
+  version: a620c1cc9866f84a2550ad53f4f353ec030fa26b
+testImports: []

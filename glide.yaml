@@ -1,0 +1,3 @@
+package: github.com/codesuki/go-time-series
+import:
+- package: github.com/benbjohnson/clock
