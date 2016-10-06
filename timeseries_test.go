@@ -26,6 +26,25 @@ func TestRecent(t *testing.T) {
 	}
 }
 
+func TestRecent2(t *testing.T) {
+	clock := clock.NewMock()
+	ts := &timeseries{clock: clock, levels: createLevels(clock, []time.Duration{time.Second, time.Minute})}
+
+	clock.Add(time.Minute * 1) // 09:01:00
+	ts.Increase(60)
+	clock.Add(time.Minute * 1) // 09:02:00
+	ts.Increase(1)
+	clock.Add(time.Minute * 1) // 09:03:00
+	ts.Increase(60)
+	clock.Add(time.Second * 1) // 09:03:01
+	ts.Increase(3)
+
+	res, _ := ts.Recent(2 * time.Minute)
+	if res != 61 {
+		t.Errorf("expected %d got %f", 61, res)
+	}
+}
+
 func TestIncrease(t *testing.T) {
 	clock := clock.NewMock()
 	ts := &timeseries{clock: clock, levels: createLevels(clock, []time.Duration{time.Second, time.Minute})}

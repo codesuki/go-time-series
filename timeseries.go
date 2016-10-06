@@ -58,12 +58,11 @@ import (
 //
 // Now = 12:10:01
 // Time span = 12:05:01 - 12:10:01 (last 5 minutes)
-// Return sum of 5m bucket 1 and 1s bucket 0
+// Return sum of 5m buckets (59/(5*60))*1, (1/(5*60))*2
 //
 // Now = 12:10:01
 // Time span = 12:04:01 - 12:10:01 (last 6 minutes)
-// Difficulty: cannot take 5 minute bin 0
-// Return sum of 1m bucket 4 and 5m bucket 1 and 1s bucket 0
+// Return sum of 1m buckets (59/60)*4, 5, 6, 7, 8, 9, (1/60)*10
 
 var (
 	ErrBadRange         = errors.New("range is invalid")
