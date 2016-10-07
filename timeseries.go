@@ -74,6 +74,9 @@ var defaultGranularities = []time.Duration{
 	time.Hour,
 }
 
+// Clock specifies the needed time related functions used by the time series.
+// To use a custom clock implement the interface and pass it to the time series constructor.
+// The default clock uses time.Now()
 type Clock interface {
 	Now() time.Time
 }
@@ -91,27 +94,36 @@ type TimeSeries interface {
 	Range(start, end time.Time) (float64, error)
 }
 
-type timeseries struct {
+type timeSeries struct {
 	clock       Clock
 	levels      []level
 	pending     int
 	pendingTime time.Time
 }
 
-// NewTimeseries creates a new TimeSeries with default granularities
-func NewTimeseries() (TimeSeries, error) {
-	return NewTimeseriesWithGranularities(defaultGranularities)
+// NewTimeSeries creates a new TimeSeries with default granularities and default clock.
+func NewTimeSeries() (TimeSeries, error) {
+	return NewTimeSeriesWithGranularitiesAndClock(defaultGranularities, &defaultClock{})
 }
 
-// NewTimeseriesWithGranularities creates a new TimeSeries with provided granularities
+// NewTimeSeriesWithGranularities creates a new TimeSeries with provided granularities.
 // ErrBadGranularities is returned if granularities are not in increasing order.
-func NewTimeseriesWithGranularities(granularities []time.Duration) (TimeSeries, error) {
+func NewTimeSeriesWithGranularities(granularities []time.Duration) (TimeSeries, error) {
+	return NewTimeSeriesWithGranularitiesAndClock(granularities, &defaultClock{})
+}
+
+// NewTimeSeriesWithClock creates a new TimeSeries with the provided clock and default granularities.
+func NewTimeSeriesWithClock(clock Clock) (TimeSeries, error) {
+	return NewTimeSeriesWithGranularitiesAndClock(defaultGranularities, clock)
+}
+
+// NewTimeSeriesWithGranularitiesAndClock creates a new TimeSeries with the provided granularities and clock.
+func NewTimeSeriesWithGranularitiesAndClock(granularities []time.Duration, clock Clock) (TimeSeries, error) {
 	err := checkGranularities(granularities)
 	if err != nil {
 		return nil, err
 	}
-	clock := &defaultClock{}
-	return &timeseries{clock: clock, levels: createLevels(clock, granularities)}, nil
+	return &timeSeries{clock: clock, levels: createLevels(clock, granularities)}, nil
 }
 
 func checkGranularities(granularities []time.Duration) error {
@@ -136,13 +148,13 @@ func createLevels(clock Clock, granularities []time.Duration) []level {
 	return levels
 }
 
-// Increase adds amount at current time
-func (t *timeseries) Increase(amount int) {
+// Increase adds amount at current time.
+func (t *timeSeries) Increase(amount int) {
 	t.IncreaseAtTime(amount, t.clock.Now())
 }
 
-// IncreaseAtTime adds amount at a specific time
-func (t *timeseries) IncreaseAtTime(amount int, time time.Time) {
+// IncreaseAtTime adds amount at a specific time.
+func (t *timeSeries) IncreaseAtTime(amount int, time time.Time) {
 	if time.After(t.pendingTime) {
 		t.advance(time)
 		t.handlePending()
@@ -155,7 +167,7 @@ func (t *timeseries) IncreaseAtTime(amount int, time time.Time) {
 	}
 }
 
-func (t *timeseries) increaseAtTime(amount int, time time.Time) {
+func (t *timeSeries) increaseAtTime(amount int, time time.Time) {
 	for i := range t.levels {
 		if time.Before(t.levels[i].latest().Add(-1 * t.levels[i].duration())) {
 			continue
@@ -164,12 +176,12 @@ func (t *timeseries) increaseAtTime(amount int, time time.Time) {
 	}
 }
 
-func (t *timeseries) handlePending() {
+func (t *timeSeries) handlePending() {
 	t.increaseAtTime(t.pending, t.pendingTime)
 	t.pending = 0
 }
 
-func (t *timeseries) advance(target time.Time) {
+func (t *timeSeries) advance(target time.Time) {
 	for i := range t.levels {
 		if !target.Before(t.levels[i].latest().Add(t.levels[i].duration())) {
 			t.levels[i].clear(target)
@@ -179,17 +191,17 @@ func (t *timeseries) advance(target time.Time) {
 	}
 }
 
-// Recent returns the sum over [now-duration, now)
-func (t *timeseries) Recent(duration time.Duration) (float64, error) {
+// Recent returns the sum over [now-duration, now).
+func (t *timeSeries) Recent(duration time.Duration) (float64, error) {
 	// TODO: advance to now
 	now := t.clock.Now()
 	return t.Range(now.Add(-duration), now)
 }
 
-// Range returns the sum over the given range [start, end)
+// Range returns the sum over the given range [start, end).
 // ErrBadRange is returned if start is after end.
 // ErrRangeNotCovered is returned if the range lies outside the time series.
-func (t *timeseries) Range(start, end time.Time) (float64, error) {
+func (t *timeSeries) Range(start, end time.Time) (float64, error) {
 	if start.After(end) {
 		return 0, ErrBadRange
 	}
@@ -206,7 +218,7 @@ func (t *timeseries) Range(start, end time.Time) (float64, error) {
 	return 0, nil
 }
 
-func (t *timeseries) intersects(start, end time.Time) (bool, error) {
+func (t *timeSeries) intersects(start, end time.Time) (bool, error) {
 	biggestLevel := t.levels[len(t.levels)-1]
 	if end.Before(biggestLevel.latest().Add(-biggestLevel.duration())) {
 		return false, ErrRangeNotCovered
