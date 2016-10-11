@@ -9,6 +9,15 @@ import (
 
 // TODO: do table based testing
 
+func TestClock(t *testing.T) {
+	clock := &defaultClock{}
+
+	// there is a small chance this won't pass
+	if clock.Now().Truncate(time.Second) != time.Now().Truncate(time.Second) {
+		t.Errorf("default clock does not track time.Now")
+	}
+}
+
 func TestNewTimeSeries(t *testing.T) {
 	ts, err := NewTimeSeries()
 	if ts == nil {
@@ -142,10 +151,11 @@ func TestIncreasePending(t *testing.T) {
 	ts.Increase(1) // this should increase pending
 	clock.Add(time.Second)
 	ts.Increase(1)
+	clock.Add(time.Second)
 
 	res, _ := ts.Recent(time.Minute)
-	if res != 2 {
-		t.Errorf("expected %d got %f", 2, res)
+	if res != 3 {
+		t.Errorf("expected %d got %f", 3, res)
 	}
 }
 

@@ -157,8 +157,6 @@ func (t *timeSeries) Increase(amount int) {
 func (t *timeSeries) IncreaseAtTime(amount int, time time.Time) {
 	if time.After(t.pendingTime) {
 		t.advance(time)
-		t.handlePending()
-		t.pendingTime = t.levels[0].latest()
 		t.pending = amount
 	} else if time.After(t.pendingTime.Add(-t.levels[0].granularity)) {
 		t.pending++
@@ -176,12 +174,15 @@ func (t *timeSeries) increaseAtTime(amount int, time time.Time) {
 	}
 }
 
-func (t *timeSeries) handlePending() {
-	t.increaseAtTime(t.pending, t.pendingTime)
-	t.pending = 0
+func (t *timeSeries) advance(target time.Time) {
+	if target == t.pendingTime {
+		return
+	}
+	t.advanceLevels(target)
+	t.handlePending()
 }
 
-func (t *timeSeries) advance(target time.Time) {
+func (t *timeSeries) advanceLevels(target time.Time) {
 	for i := range t.levels {
 		if !target.Before(t.levels[i].latest().Add(t.levels[i].duration())) {
 			t.levels[i].clear(target)
@@ -191,10 +192,16 @@ func (t *timeSeries) advance(target time.Time) {
 	}
 }
 
+func (t *timeSeries) handlePending() {
+	t.increaseAtTime(t.pending, t.pendingTime)
+	t.pending = 0
+	t.pendingTime = t.levels[0].latest()
+}
+
 // Recent returns the sum over [now-duration, now).
 func (t *timeSeries) Recent(duration time.Duration) (float64, error) {
-	// TODO: advance to now
 	now := t.clock.Now()
+	t.advance(now)
 	return t.Range(now.Add(-duration), now)
 }
 
