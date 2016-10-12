@@ -69,7 +69,7 @@ func TestNewTimeSeriesWithClock(t *testing.T) {
 	}
 }
 
-func TestRecent(t *testing.T) {
+func TestRecentSeconds(t *testing.T) {
 	clock := clock.NewMock()
 	ts, _ := NewTimeSeriesWithGranularitiesAndClock([]time.Duration{time.Second, time.Minute}, clock)
 
@@ -86,7 +86,7 @@ func TestRecent(t *testing.T) {
 	}
 }
 
-func TestRecent2(t *testing.T) {
+func TestRecentMinutes(t *testing.T) {
 	clock := clock.NewMock()
 	ts, _ := NewTimeSeriesWithGranularitiesAndClock([]time.Duration{time.Second, time.Minute}, clock)
 
@@ -102,6 +102,46 @@ func TestRecent2(t *testing.T) {
 	res, _ := ts.Recent(2 * time.Minute)
 	if res != 61 {
 		t.Errorf("expected %d got %f", 61, res)
+	}
+}
+
+func TestRecentWholeRange(t *testing.T) {
+	clock := clock.NewMock()
+	ts, _ := NewTimeSeriesWithGranularitiesAndClock([]time.Duration{time.Second, time.Minute}, clock)
+
+	clock.Add(time.Minute * 1) // 09:01:00
+	ts.Increase(60)
+	clock.Add(time.Minute * 1) // 09:02:00
+	ts.Increase(1)
+	clock.Add(time.Minute * 1) // 09:03:00
+	ts.Increase(60)
+	clock.Add(time.Second * 1) // 09:03:01
+	ts.Increase(3)
+
+	// 60 + 1 + 60 * 1/60 (1 second of 1 minute bin) = 62
+	res, _ := ts.Recent(60 * time.Minute)
+	if res != 62 {
+		t.Errorf("expected %d got %f", 62, res)
+	}
+}
+
+func TestRecentWholeRangeBig(t *testing.T) {
+	clock := clock.NewMock()
+	ts, _ := NewTimeSeriesWithGranularitiesAndClock([]time.Duration{time.Second, time.Minute}, clock)
+
+	clock.Add(time.Minute * 1) // 09:01:00
+	ts.Increase(60)
+	clock.Add(time.Minute * 1) // 09:02:00
+	ts.Increase(1)
+	clock.Add(time.Minute * 1) // 09:03:00
+	ts.Increase(60)
+	clock.Add(time.Second * 1) // 09:03:01
+	ts.Increase(3)
+
+	// 60 + 1 + 60 * 1/60 (1 second of 1 minute bin) = 62
+	res, _ := ts.Recent(120 * time.Minute)
+	if res != 62 {
+		t.Errorf("expected %d got %f", 62, res)
 	}
 }
 
