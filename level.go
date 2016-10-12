@@ -37,7 +37,7 @@ func (l *level) clear(time time.Time) {
 }
 
 func (l *level) duration() time.Duration {
-	return l.granularity * time.Duration(l.length)
+	return l.granularity*time.Duration(l.length) - l.granularity
 }
 
 func (l *level) earliest() time.Time {
@@ -49,7 +49,7 @@ func (l *level) latest() time.Time {
 }
 
 func (l *level) increaseAtTime(amount int, time time.Time) {
-	difference := l.end.Add(-l.granularity).Sub(time.Truncate(l.granularity))
+	difference := l.end.Sub(time.Truncate(l.granularity))
 	if difference < 0 {
 		// this cannot be negative because we advance before
 		// can at least be 0
@@ -81,7 +81,6 @@ func (l *level) sumInterval(start, end time.Time) float64 {
 		end = l.latest()
 	}
 	idx := 0
-
 	// this is how many time steps start is away from earliest
 	startSteps := start.Sub(l.earliest()) / l.granularity
 	idx += int(startSteps)

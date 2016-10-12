@@ -193,7 +193,7 @@ func TestIncreasePending(t *testing.T) {
 	ts.Increase(1)
 	clock.Add(time.Second)
 
-	res, _ := ts.Recent(time.Minute)
+	res, _ := ts.Recent(59 * time.Second)
 	if res != 3 {
 		t.Errorf("expected %d got %f", 3, res)
 	}
@@ -203,13 +203,15 @@ func TestIncreaseAtTime(t *testing.T) {
 	clock := clock.NewMock()
 	ts, _ := NewTimeSeriesWithGranularitiesAndClock([]time.Duration{time.Second, time.Minute}, clock)
 
-	ts.Increase(1)
-	clock.Add(time.Second)
-	ts.IncreaseAtTime(1, clock.Now().Add(-1*time.Minute))
-	ts.Increase(1)
+	ts.Increase(60)                                        // time: 09:00:00
+	clock.Add(time.Second)                                 // time: 09:00:01
+	ts.IncreaseAtTime(60, clock.Now().Add(-1*time.Minute)) // time: 08:59:01
+	ts.Increase(1)                                         // time: 09:00:01
 
+	// from: 08:59:01 - 09:00:01
+	// (59/60 * 60) + (1/60 * 60) = 60
 	res, _ := ts.Recent(time.Minute)
-	if res != 2 {
+	if res != 60 {
 		t.Errorf("expected %d got %f", 2, res)
 	}
 }
