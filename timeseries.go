@@ -95,8 +95,8 @@ func (c *defaultClock) Now() time.Time {
 // Granularity describes the granularity for one level of the time series.
 // Count cannot be 0.
 type Granularity struct {
-	granularity time.Duration
-	count       int
+	Granularity time.Duration
+	Count       int
 }
 
 type options struct {
@@ -158,13 +158,13 @@ func checkGranularities(granularities []Granularity) error {
 	}
 	last := time.Duration(0)
 	for i := 0; i < len(granularities); i++ {
-		if granularities[i].count == 0 {
+		if granularities[i].Count == 0 {
 			return ErrBadGranularities
 		}
-		if granularities[i].granularity <= last {
+		if granularities[i].Granularity <= last {
 			return ErrBadGranularities
 		}
-		last = granularities[i].granularity
+		last = granularities[i].Granularity
 	}
 	return nil
 }
@@ -172,7 +172,7 @@ func checkGranularities(granularities []Granularity) error {
 func createLevels(clock Clock, granularities []Granularity) []level {
 	levels := make([]level, len(granularities))
 	for i := range granularities {
-		levels[i] = newLevel(clock, granularities[i].granularity, granularities[i].count)
+		levels[i] = newLevel(clock, granularities[i].Granularity, granularities[i].Count)
 	}
 	return levels
 }
