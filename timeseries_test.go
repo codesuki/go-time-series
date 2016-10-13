@@ -9,6 +9,20 @@ import (
 
 // TODO: do table based testing
 
+func setup() (*TimeSeries, *clock.Mock) {
+	clock := clock.NewMock()
+	ts, _ := NewTimeSeries(
+		WithClock(clock),
+		WithGranularities(
+			[]Granularity{
+				{time.Second, 60},
+				{time.Minute, 60},
+			},
+		),
+	)
+	return ts, clock
+}
+
 func TestClock(t *testing.T) {
 	clock := &defaultClock{}
 
@@ -29,27 +43,37 @@ func TestNewTimeSeries(t *testing.T) {
 }
 
 func TestNewTimeSeriesWithGranularities(t *testing.T) {
-	granularities := []time.Duration{
-		time.Second,
-		time.Minute,
-		time.Hour,
+	granularities := []Granularity{
+		{time.Second, 60},
+		{time.Minute, 60},
+		{time.Hour, 24},
 	}
-	ts, err := NewTimeSeriesWithGranularities(granularities)
+	ts, err := NewTimeSeries(WithGranularities(granularities))
 	if ts == nil || err != nil {
 		t.Error("could not create time series")
 	}
 
-	badGranularities := []time.Duration{
-		time.Minute,
-		time.Second,
-		time.Hour,
+	badGranularities := []Granularity{
+		{time.Minute, 60},
+		{time.Second, 60},
+		{time.Hour, 24},
 	}
-	_, err = NewTimeSeriesWithGranularities(badGranularities)
+	_, err = NewTimeSeries(WithGranularities(badGranularities))
 	if err != ErrBadGranularities {
 		t.Error("should not accept decreasing granularities")
 	}
 
-	_, err = NewTimeSeriesWithGranularities([]time.Duration{})
+	badGranularities = []Granularity{
+		{time.Minute, 60},
+		{time.Second, 0},
+		{time.Hour, 24},
+	}
+	_, err = NewTimeSeries(WithGranularities(badGranularities))
+	if err != ErrBadGranularities {
+		t.Error("should not accept granularities with zero count")
+	}
+
+	_, err = NewTimeSeries(WithGranularities([]Granularity{}))
 	if err != ErrBadGranularities {
 		t.Error("should not accept empty granularities")
 	}
@@ -57,7 +81,7 @@ func TestNewTimeSeriesWithGranularities(t *testing.T) {
 
 func TestNewTimeSeriesWithClock(t *testing.T) {
 	clock := clock.NewMock()
-	ts, _ := NewTimeSeriesWithClock(clock)
+	ts, _ := NewTimeSeries(WithClock(clock))
 
 	ts.Increase(2)
 	clock.Add(time.Second * 1)
@@ -69,9 +93,8 @@ func TestNewTimeSeriesWithClock(t *testing.T) {
 	}
 }
 
-func TestRecent(t *testing.T) {
-	clock := clock.NewMock()
-	ts, _ := NewTimeSeriesWithGranularitiesAndClock([]time.Duration{time.Second, time.Minute}, clock)
+func TestRecentSeconds(t *testing.T) {
+	ts, clock := setup()
 
 	clock.Add(time.Minute * 5)
 	ts.Increase(1)
@@ -86,9 +109,8 @@ func TestRecent(t *testing.T) {
 	}
 }
 
-func TestRecent2(t *testing.T) {
-	clock := clock.NewMock()
-	ts, _ := NewTimeSeriesWithGranularitiesAndClock([]time.Duration{time.Second, time.Minute}, clock)
+func TestRecentMinutes(t *testing.T) {
+	ts, clock := setup()
 
 	clock.Add(time.Minute * 1) // 09:01:00
 	ts.Increase(60)
@@ -105,9 +127,46 @@ func TestRecent2(t *testing.T) {
 	}
 }
 
+func TestRecentWholeRange(t *testing.T) {
+	ts, clock := setup()
+
+	clock.Add(time.Minute * 1) // 09:01:00
+	ts.Increase(60)
+	clock.Add(time.Minute * 1) // 09:02:00
+	ts.Increase(1)
+	clock.Add(time.Minute * 1) // 09:03:00
+	ts.Increase(60)
+	clock.Add(time.Second * 1) // 09:03:01
+	ts.Increase(3)
+
+	// 60 + 1 + 60 * 1/60 (1 second of 1 minute bin) = 62
+	res, _ := ts.Recent(60 * time.Minute)
+	if res != 62 {
+		t.Errorf("expected %d got %f", 62, res)
+	}
+}
+
+func TestRecentWholeRangeBig(t *testing.T) {
+	ts, clock := setup()
+
+	clock.Add(time.Minute * 1) // 09:01:00
+	ts.Increase(60)
+	clock.Add(time.Minute * 1) // 09:02:00
+	ts.Increase(1)
+	clock.Add(time.Minute * 1) // 09:03:00
+	ts.Increase(60)
+	clock.Add(time.Second * 1) // 09:03:01
+	ts.Increase(3)
+
+	// 60 + 1 + 60 * 1/60 (1 second of 1 minute bin) = 62
+	res, _ := ts.Recent(120 * time.Minute)
+	if res != 62 {
+		t.Errorf("expected %d got %f", 62, res)
+	}
+}
+
 func TestIncrease(t *testing.T) {
-	clock := clock.NewMock()
-	ts, _ := NewTimeSeriesWithGranularitiesAndClock([]time.Duration{time.Second, time.Minute}, clock)
+	ts, clock := setup()
 
 	// time 12:00
 	ts.Increase(2)
@@ -144,8 +203,7 @@ func TestIncrease(t *testing.T) {
 }
 
 func TestIncreasePending(t *testing.T) {
-	clock := clock.NewMock()
-	ts, _ := NewTimeSeriesWithGranularitiesAndClock([]time.Duration{time.Second, time.Minute}, clock)
+	ts, clock := setup()
 
 	ts.Increase(1) // this should advance and reset pending
 	ts.Increase(1) // this should increase pending
@@ -153,23 +211,24 @@ func TestIncreasePending(t *testing.T) {
 	ts.Increase(1)
 	clock.Add(time.Second)
 
-	res, _ := ts.Recent(time.Minute)
+	res, _ := ts.Recent(59 * time.Second)
 	if res != 3 {
 		t.Errorf("expected %d got %f", 3, res)
 	}
 }
 
 func TestIncreaseAtTime(t *testing.T) {
-	clock := clock.NewMock()
-	ts, _ := NewTimeSeriesWithGranularitiesAndClock([]time.Duration{time.Second, time.Minute}, clock)
+	ts, clock := setup()
 
-	ts.Increase(1)
-	clock.Add(time.Second)
-	ts.IncreaseAtTime(1, clock.Now().Add(-1*time.Minute))
-	ts.Increase(1)
+	ts.Increase(60)                                        // time: 09:00:00
+	clock.Add(time.Second)                                 // time: 09:00:01
+	ts.IncreaseAtTime(60, clock.Now().Add(-1*time.Minute)) // time: 08:59:01
+	ts.Increase(1)                                         // time: 09:00:01
 
+	// from: 08:59:01 - 09:00:01
+	// (59/60 * 60) + (1/60 * 60) = 60
 	res, _ := ts.Recent(time.Minute)
-	if res != 2 {
+	if res != 60 {
 		t.Errorf("expected %d got %f", 2, res)
 	}
 }

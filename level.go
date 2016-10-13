@@ -37,7 +37,7 @@ func (l *level) clear(time time.Time) {
 }
 
 func (l *level) duration() time.Duration {
-	return l.granularity * time.Duration(l.length)
+	return l.granularity*time.Duration(l.length) - l.granularity
 }
 
 func (l *level) earliest() time.Time {
@@ -49,7 +49,7 @@ func (l *level) latest() time.Time {
 }
 
 func (l *level) increaseAtTime(amount int, time time.Time) {
-	difference := l.end.Add(-l.granularity).Sub(time.Truncate(l.granularity))
+	difference := l.end.Sub(time.Truncate(l.granularity))
 	if difference < 0 {
 		// this cannot be negative because we advance before
 		// can at least be 0
@@ -74,36 +74,35 @@ func (l *level) advance(target time.Time) {
 }
 
 func (l *level) sumInterval(start, end time.Time) float64 {
-	// we know that start is not before l.earliest()
+	if start.Before(l.earliest()) {
+		start = l.earliest()
+	}
 	if end.After(l.latest()) {
 		end = l.latest()
 	}
 	idx := 0
-
 	// this is how many time steps start is away from earliest
 	startSteps := start.Sub(l.earliest()) / l.granularity
 	idx += int(startSteps)
 
 	currentTime := l.earliest()
 	currentTime = currentTime.Add(startSteps * l.granularity)
-	//	steps := int(end.Sub(start) / l.granularity)
 
 	sum := 0.0
 	for idx < l.length && currentTime.Before(end) {
 		nextTime := currentTime.Add(l.granularity)
-		if !nextTime.Before(start) {
-			count := float64(l.buckets[(l.oldest+idx)%l.length])
-			if currentTime.Before(start) || nextTime.After(end) {
-				// current bucket overlaps time range
-				overlapStart := max(currentTime, start)
-				overlapEnd := min(nextTime, end)
-				overlap := overlapEnd.Sub(overlapStart).Seconds() / l.granularity.Seconds()
-				count *= overlap
-			}
-			sum += count
-		} else {
-			log.Println("level.sumInterval else")
+		if nextTime.Before(start) {
+			log.Println("level.sumInterval this should not happen")
 		}
+		count := float64(l.buckets[(l.oldest+idx)%l.length])
+		if currentTime.Before(start) || nextTime.After(end) {
+			// current bucket overlaps time range
+			overlapStart := max(currentTime, start)
+			overlapEnd := min(nextTime, end)
+			overlap := overlapEnd.Sub(overlapStart).Seconds() / l.granularity.Seconds()
+			count *= overlap
+		}
+		sum += count
 		idx++
 		currentTime = currentTime.Add(l.granularity)
 	}
