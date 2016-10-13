@@ -63,15 +63,19 @@ import (
 // Return sum of 1m buckets (59/60)*4, 5, 6, 7, 8, 9, (1/60)*10
 
 var (
-	ErrBadRange         = errors.New("range is invalid")
-	ErrBadGranularities = errors.New("granularities must be strictly increasing and non empty")
-	ErrRangeNotCovered  = errors.New("range is not convered")
+	// ErrBadRange indicates that the given range is invalid. Start should always be <= End
+	ErrBadRange = errors.New("timeseries: range is invalid")
+	// ErrBadGranularities indicates that the provided granularities are not strictly increasing
+	ErrBadGranularities = errors.New("timeseries: granularities must be strictly increasing and non empty")
+	// ErrRangeNotCovered indicates that the provided range lies outside the time series
+	ErrRangeNotCovered = errors.New("timeseries: range is not convered")
 )
 
-var defaultGranularities = []time.Duration{
-	time.Second,
-	time.Minute,
-	time.Hour,
+// defaultGranularities are used in case no granularities are provided to the constructor.
+var defaultGranularities = []Granularity{
+	{time.Second, 60},
+	{time.Minute, 60},
+	{time.Hour, 24},
 }
 
 // Clock specifies the needed time related functions used by the time series.
@@ -81,10 +85,40 @@ type Clock interface {
 	Now() time.Time
 }
 
+// defaultClock is used in case no clock is provided to the constructor.
 type defaultClock struct{}
 
 func (c *defaultClock) Now() time.Time {
 	return time.Now()
+}
+
+// Granularity describes the granularity for one level of the time series.
+// Count cannot be 0.
+type Granularity struct {
+	granularity time.Duration
+	count       int
+}
+
+type options struct {
+	clock         Clock
+	granularities []Granularity
+}
+
+// Option configures the time series.
+type Option func(*options)
+
+// WithClock returns a Option that sets the clock used by the time series.
+func WithClock(c Clock) Option {
+	return func(o *options) {
+		o.clock = c
+	}
+}
+
+// WithGranularities returns a Option that sets the granularites used by the time series.
+func WithGranularities(g []Granularity) Option {
+	return func(o *options) {
+		o.granularities = g
+	}
 }
 
 type TimeSeries struct {
@@ -94,24 +128,23 @@ type TimeSeries struct {
 	pendingTime time.Time
 }
 
-// NewTimeSeries creates a new TimeSeries with default granularities and default clock.
-func NewTimeSeries() (*TimeSeries, error) {
-	return NewTimeSeriesWithGranularitiesAndClock(defaultGranularities, &defaultClock{})
+// NewTimeSeries creates a new time series with the provided options.
+// If no options are provided default values are used.
+func NewTimeSeries(os ...Option) (*TimeSeries, error) {
+	opts := options{}
+	for _, o := range os {
+		o(&opts)
+	}
+	if opts.clock == nil {
+		opts.clock = &defaultClock{}
+	}
+	if opts.granularities == nil {
+		opts.granularities = defaultGranularities
+	}
+	return newTimeSeries(opts.clock, opts.granularities)
 }
 
-// NewTimeSeriesWithGranularities creates a new TimeSeries with provided granularities.
-// ErrBadGranularities is returned if granularities are not in increasing order.
-func NewTimeSeriesWithGranularities(granularities []time.Duration) (*TimeSeries, error) {
-	return NewTimeSeriesWithGranularitiesAndClock(granularities, &defaultClock{})
-}
-
-// NewTimeSeriesWithClock creates a new TimeSeries with the provided clock and default granularities.
-func NewTimeSeriesWithClock(clock Clock) (*TimeSeries, error) {
-	return NewTimeSeriesWithGranularitiesAndClock(defaultGranularities, clock)
-}
-
-// NewTimeSeriesWithGranularitiesAndClock creates a new TimeSeries with the provided granularities and clock.
-func NewTimeSeriesWithGranularitiesAndClock(granularities []time.Duration, clock Clock) (*TimeSeries, error) {
+func newTimeSeries(clock Clock, granularities []Granularity) (*TimeSeries, error) {
 	err := checkGranularities(granularities)
 	if err != nil {
 		return nil, err
@@ -119,24 +152,27 @@ func NewTimeSeriesWithGranularitiesAndClock(granularities []time.Duration, clock
 	return &TimeSeries{clock: clock, levels: createLevels(clock, granularities)}, nil
 }
 
-func checkGranularities(granularities []time.Duration) error {
+func checkGranularities(granularities []Granularity) error {
 	if len(granularities) == 0 {
 		return ErrBadGranularities
 	}
-	last := granularities[0]
-	for i := 1; i < len(granularities); i++ {
-		if granularities[i] <= last {
+	last := time.Duration(0)
+	for i := 0; i < len(granularities); i++ {
+		if granularities[i].count == 0 {
 			return ErrBadGranularities
 		}
-		last = granularities[i]
+		if granularities[i].granularity <= last {
+			return ErrBadGranularities
+		}
+		last = granularities[i].granularity
 	}
 	return nil
 }
 
-func createLevels(clock Clock, granularities []time.Duration) []level {
+func createLevels(clock Clock, granularities []Granularity) []level {
 	levels := make([]level, len(granularities))
 	for i := range granularities {
-		levels[i] = newLevel(clock, granularities[i], 60)
+		levels[i] = newLevel(clock, granularities[i].granularity, granularities[i].count)
 	}
 	return levels
 }
