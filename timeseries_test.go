@@ -163,7 +163,7 @@ func TestRecentWholeRangeBig(t *testing.T) {
 
 	// 60 + 1 + 60 * 1/60 (1 second of 1 minute bin) = 62
 	res, _ := ts.Recent(120 * time.Minute)
-	if res != 124 {
+	if res != 62 {
 		t.Errorf("expected %d got %f", 62, res)
 	}
 }
