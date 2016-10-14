@@ -14,9 +14,9 @@ In case of go-trending the time series is configured to have recent data availab
 
 A redis backend is planned.
 
-    * Simple interface
-    * Store time series data at different granularities
-    * Use your own clock implementation, e.g. for testing or similar
+* Simple interface
+* Store time series data at different granularities
+* Use your own clock implementation, e.g. for testing or similar
 
 ## Examples
 
