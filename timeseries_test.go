@@ -158,6 +158,9 @@ func TestRecentWholeRangeBig(t *testing.T) {
 	clock.Add(time.Second * 1) // 09:03:01
 	ts.Increase(3)
 
+	// when querying the most recent time at a bigger granularity,
+	// here 1m, there is some error because the count will be interpolated.
+
 	// 60 + 1 + 60 * 1/60 (1 second of 1 minute bin) = 62
 	res, _ := ts.Recent(120 * time.Minute)
 	if res != 62 {
