@@ -73,7 +73,10 @@ func (l *level) advance(target time.Time) {
 	}
 }
 
-func (l *level) sumInterval(start, end time.Time) float64 {
+// TODO: find a better way to handle latest parameter
+// The parameter is used to avoid the overlap computation if end overlaps with the current time.
+// Probably will find away when implementing redis version.
+func (l *level) sumInterval(start, end time.Time, latest time.Time) float64 {
 	if start.Before(l.earliest()) {
 		start = l.earliest()
 	}
@@ -91,8 +94,13 @@ func (l *level) sumInterval(start, end time.Time) float64 {
 	sum := 0.0
 	for idx < l.length && currentTime.Before(end) {
 		nextTime := currentTime.Add(l.granularity)
+		if nextTime.After(latest) {
+			nextTime = latest
+		}
 		if nextTime.Before(start) {
-			log.Println("level.sumInterval this should not happen")
+			// the case nextTime.Before(start) happens when start is after latest
+			// therefore we don't have data and can return
+			break
 		}
 		count := float64(l.buckets[(l.oldest+idx)%l.length])
 		if currentTime.Before(start) || nextTime.After(end) {
