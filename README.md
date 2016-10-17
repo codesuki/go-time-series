@@ -9,7 +9,7 @@
 Time series implementation in Go.
 
 It is used in [go-trending](https://www.github.com/codesuki/go-trending) as a backend for a trending algorithm.
-The time series supports storing counts at different granularities, e.g. seconds, minutes, hours, ....
+The time series supports storing counts at different granularities, e.g. seconds, minutes, hours, ....<br />
 In case of go-trending the time series is configured to have recent data available at small granularity, i.e. the recent 60 seconds, and historical data available at large granularity, i.e. the last few hours, days of data.
 
 A redis backend is planned.
