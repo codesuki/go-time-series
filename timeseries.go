@@ -126,6 +126,7 @@ type TimeSeries struct {
 	levels      []level
 	pending     int
 	pendingTime time.Time
+	latest      time.Time
 }
 
 // NewTimeSeries creates a new time series with the provided options.
@@ -184,6 +185,9 @@ func (t *TimeSeries) Increase(amount int) {
 
 // IncreaseAtTime adds amount at a specific time.
 func (t *TimeSeries) IncreaseAtTime(amount int, time time.Time) {
+	if time.After(t.latest) {
+		t.latest = time
+	}
 	if time.After(t.pendingTime) {
 		t.advance(time)
 		t.pending = amount
@@ -250,10 +254,10 @@ func (t *TimeSeries) Range(start, end time.Time) (float64, error) {
 		// use !start.Before so earliest() is included
 		// if we use earliest().Before() we won't get start
 		if !start.Before(t.levels[i].earliest()) {
-			return t.levels[i].sumInterval(start, end), nil
+			return t.levels[i].sumInterval(start, end, t.latest), nil
 		}
 	}
-	return t.levels[len(t.levels)-1].sumInterval(start, end), nil
+	return t.levels[len(t.levels)-1].sumInterval(start, end, t.latest), nil
 }
 
 func (t *TimeSeries) intersects(start, end time.Time) (bool, error) {

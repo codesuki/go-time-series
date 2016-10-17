@@ -103,9 +103,29 @@ func TestRecentSeconds(t *testing.T) {
 	clock.Add(time.Second * 1)
 	ts.Increase(3)
 
-	res, _ := ts.Recent(2 * time.Second)
+	res, _ := ts.Recent(time.Second)
+	if res != 2 {
+		t.Errorf("expected %d got %f", 2, res)
+	}
+
+	res, _ = ts.Recent(2 * time.Second)
 	if res != 3 {
 		t.Errorf("expected %d got %f", 3, res)
+	}
+
+	// test earliest second
+	clock.Add(57 * time.Second) // time: 09:05:59
+	res, _ = ts.Recent(59 * time.Second)
+	if res != 6 {
+		t.Errorf("expected %d got %f", 6, res)
+	}
+
+	// test future time
+	clock.Add(1 * time.Second)
+	clock.Add(57 * time.Second) // time: 09:06:00
+	res, _ = ts.Recent(59 * time.Second)
+	if res != 0 {
+		t.Errorf("expected %d got %f", 0, res)
 	}
 }
 
@@ -121,9 +141,32 @@ func TestRecentMinutes(t *testing.T) {
 	clock.Add(time.Second * 1) // 09:03:01
 	ts.Increase(3)
 
+	// test interpolation at beginning
+	// 59/60 * 60 + 1 + 60 = 120
 	res, _ := ts.Recent(2 * time.Minute)
-	if res != 61 {
-		t.Errorf("expected %d got %f", 61, res)
+	if res != 120 {
+		t.Errorf("expected %d got %f", 120, res)
+	}
+
+	// test interpolation at end
+	// 60/2 = 30
+	res, _ = ts.Range(
+		clock.Now().Add(-2*time.Minute+-1*time.Second),  // 09:01:00
+		clock.Now().Add(-1*time.Minute+-31*time.Second), // 09:01:30
+	)
+	if res != 30 {
+		t.Errorf("expected %d got %f", 30, res)
+	}
+
+	// get from earliest data point
+	clock.Add(time.Second*59 + time.Minute*56)
+	ts.Increase(60)
+	clock.Add(time.Minute * 1)
+	ts.Increase(70)
+	clock.Add(time.Minute * 59)
+	res, _ = ts.Recent(time.Minute * 60)
+	if res != 70 {
+		t.Errorf("expected %d got %f", 70, res)
 	}
 }
 
@@ -139,9 +182,9 @@ func TestRecentWholeRange(t *testing.T) {
 	clock.Add(time.Second * 1) // 09:03:01
 	ts.Increase(3)
 
-	// 60 + 1 + 60 * 1/60 (1 second of 1 minute bin) = 62
+	// 60 + 1 + 60 = 121
 	res, _ := ts.Recent(60 * time.Minute)
-	if res != 62 {
+	if res != 121 {
 		t.Errorf("expected %d got %f", 62, res)
 	}
 }
@@ -158,13 +201,10 @@ func TestRecentWholeRangeBig(t *testing.T) {
 	clock.Add(time.Second * 1) // 09:03:01
 	ts.Increase(3)
 
-	// when querying the most recent time at a bigger granularity,
-	// here 1m, there is some error because the count will be interpolated.
-
-	// 60 + 1 + 60 * 1/60 (1 second of 1 minute bin) = 62
+	// 60 + 1 + 60 = 121
 	res, _ := ts.Recent(120 * time.Minute)
-	if res != 62 {
-		t.Errorf("expected %d got %f", 62, res)
+	if res != 121 {
+		t.Errorf("expected %d got %f", 121, res)
 	}
 }
 
@@ -212,9 +252,15 @@ func TestIncreasePending(t *testing.T) {
 	ts.Increase(1) // this should increase pending
 	clock.Add(time.Second)
 	ts.Increase(1)
-	clock.Add(time.Second)
 
 	res, _ := ts.Recent(59 * time.Second)
+	if res != 2 {
+		t.Errorf("expected %d got %f", 2, res)
+	}
+
+	clock.Add(time.Second) // the latest data gets merged in because time advanced
+
+	res, _ = ts.Recent(59 * time.Second)
 	if res != 3 {
 		t.Errorf("expected %d got %f", 3, res)
 	}
@@ -229,57 +275,19 @@ func TestIncreaseAtTime(t *testing.T) {
 	ts.Increase(1)                                         // time: 09:00:01
 
 	// from: 08:59:01 - 09:00:01
-	// (59/60 * 60) + (1/60 * 60) = 60
+	// (59/60 * 60) + 60 = 119
 	res, _ := ts.Recent(time.Minute)
+	if res != 119 {
+		t.Errorf("expected %d got %f", 119, res)
+	}
+
+	// from: 08:59:00 - 09:00:00
+	// 60
+	res, _ = ts.Range(
+		clock.Now().Add(-1*time.Minute+-1*time.Second),
+		clock.Now().Add(-1*time.Second),
+	)
 	if res != 60 {
-		t.Errorf("expected %d got %f", 2, res)
+		t.Errorf("expected %d got %f", 60, res)
 	}
 }
-
-/*
-func TestRecent(t *testing.T) {
-	clock := clock.NewMock()
-	ts := &timeseries{clock: clock, levels: createLevels(clock, []time.Duration{time.Second, time.Minute})}
-
-	// time 12:00
-	ts.Increase(2)
-	clock.Add(time.Minute * 1) // time: 12:01:00
-	ts.Increase(4)
-	clock.Add(time.Minute * 1) // time: 12:02:00
-	ts.Increase(6)
-	clock.Add(time.Second * 1) // time: 12:02:01
-	ts.Increase(1)
-	clock.Add(time.Second * 10) // time: 12:02:11
-	ts.Increase(2)
-	clock.Add(time.Second * 10) // time: 12:02:21
-	ts.Increase(2)
-	clock.Add(time.Second * 10) // time: 12:02:31
-	ts.Increase(2)
-	clock.Add(time.Second * 10) // time: 12:02:41
-	ts.Increase(2)
-	clock.Add(time.Second * 10) // time: 12:02:51
-	ts.Increase(2)
-	clock.Add(time.Second * 9) // time: 12:03:00
-	ts.Increase(9)
-	clock.Add(time.Second * 1) // time: 12:03:01
-	ts.Increase(1)
-
-	fmt.Println(ts.Recent(time.Second * 30)) //==15
-	fmt.Println(ts.Recent(time.Second * 1))  //==9
-	fmt.Println(ts.Recent(time.Second * 60)) //==20
-}
-
-*/
-/*
-func TestIncrease2(t *testing.T) {
-	clock := clock.NewMock()
-	ts := &timeseries{clock: clock, levels: createLevels(clock, []time.Duration{time.Second, time.Minute})}
-
-	// time 12:00
-	ts.Increase(2)
-	clock.Add(time.Minute * 60) // time: 13:00:00
-	ts.Increase(3)
-
-	fmt.Println(ts.Recent(time.Minute * 60)) //==2
-}
-*/
