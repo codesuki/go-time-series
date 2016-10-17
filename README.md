@@ -97,7 +97,7 @@ if err != nil {
 
 ts.Increase(2) // adds 2 to the counter at the current time
 // 1s passes
-ts.Incrase(3)
+ts.Increase(3)
 // 1s passes
 
 ts.Recent(5 * time.Second) // returns 5
