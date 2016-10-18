@@ -208,6 +208,37 @@ func TestRecentWholeRangeBig(t *testing.T) {
 	}
 }
 
+func TestRangeBadRange(t *testing.T) {
+	ts, clock := setup()
+
+	clock.Add(time.Minute * 1) // 09:01:00
+	ts.Increase(60)
+	clock.Add(time.Minute * 1) // 09:02:00
+	ts.Increase(1)
+	clock.Add(time.Minute * 1) // 09:03:00
+	ts.Increase(60)
+	clock.Add(time.Second * 1) // 09:03:01
+	ts.Increase(3)
+
+	// start is after end
+	_, err := ts.Range(clock.Now().Add(time.Minute), clock.Now())
+	if err != ErrBadRange {
+		t.Errorf("should return ErrBadRange")
+	}
+
+	// range is after end
+	_, err = ts.Range(clock.Now().Add(time.Minute), clock.Now().Add(5*time.Minute))
+	if err != ErrRangeNotCovered {
+		t.Errorf("should return ErrRangeNotCovered")
+	}
+
+	// range is before start
+	_, err = ts.Range(clock.Now().Add(-5*time.Hour), clock.Now().Add(-4*time.Hour))
+	if err != ErrRangeNotCovered {
+		t.Errorf("should return ErrRangeNotCovered")
+	}
+}
+
 func TestIncrease(t *testing.T) {
 	ts, clock := setup()
 
