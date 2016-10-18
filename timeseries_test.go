@@ -208,6 +208,18 @@ func TestRecentWholeRangeBig(t *testing.T) {
 	}
 }
 
+func TestRangeEndInFuture(t *testing.T) {
+	ts, clock := setup()
+
+	clock.Add(time.Minute * 1) // 09:01:00
+	ts.Increase(1)
+
+	res, _ := ts.Range(clock.Now().Add(-1*time.Minute), clock.Now().Add(5*time.Minute))
+	if res != 0 {
+		t.Errorf("expected %d got %f", 0, res)
+	}
+}
+
 func TestRangeBadRange(t *testing.T) {
 	ts, clock := setup()
 
